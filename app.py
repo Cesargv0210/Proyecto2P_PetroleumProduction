@@ -6,10 +6,10 @@ from streamlit_option_menu import option_menu
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Volve Production Insights",
-    page_icon="🛢️",
+    page_title="Production Analisis",
+    page_icon="Logo.png",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # --- ESTILO CSS PERSONALIZADO ---
@@ -28,6 +28,10 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #0e1117;
     }
+    /* OCULTAR SOLO EL MENÚ SUPERIOR */
+    header {
+    display: none;
+    }
     .stTabs [data-baseweb="tab-list"] {
         gap: 24px;
     }
@@ -42,7 +46,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
 
 # --- LÓGICA DE CÁLCULO (Se mantiene intacta) ---
 def j_calc(q_test, pwf_test, pr, pb, ef=1):
