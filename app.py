@@ -78,19 +78,44 @@ def Qo_calc(q_test, pwf_test, pr, pwf, pb, ef=1):
 # --- NAVEGACIÓN LATERAL ---
 with st.sidebar:
     st.image(
-        "https://www.shutterstock.com/image-vector/oil-rig-logo-template-vector-260nw-1490217038.jpg",
-        width=100)  # Placeholder para logo
-    st.title("Volve Analytics")
+        "Company.png",
+        width=200)  # Placeholder para logo
+    st.markdown(
+        """
+        <div style="
+            color:#f39c12;
+            text-align:center;
+            font-size:30px;
+            font-weight:700;
+            margin-bottom:12px;
+        ">
+            Production Analisis
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     st.markdown("---")
+    st.markdown(
+        """
+        <h4 style="
+            color:#f39c12;
+            text-align:left;
+            margin:10px 0px 5px 0px;
+        ">
+            Options
+        </h4>
+        """,
+        unsafe_allow_html=True
+    )
     selected = option_menu(
         menu_title=None,
         options=["Inicio", "Historial VOLVE", "Potencial Yacimiento", "Análisis Nodal"],
         icons=["house", "database", "graph-up-arrow", "vector-pen"],
-        menu_icon="cast",
-        default_index=2,
+        menu_icon="list",
+        default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "#0e1117"},
-            "icon": {"color": "#00d4ff", "font-size": "18px"},
+            "icon": {"color": "#f39c12", "font-size": "18px"},
             "nav-link": {"color": "white", "font-size": "15px", "text-align": "left",
                          "margin": "0px"},
             "nav-link-selected": {"background-color": "#262730"},
