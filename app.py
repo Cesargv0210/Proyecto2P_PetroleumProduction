@@ -115,16 +115,20 @@ if selected == "Inicio":
 
 # --- SECCIÓN: POTENCIAL DEL YACIMIENTO ---
 elif selected == "Potencial Yacimiento":
-    st.subheader("🎯 Análisis de Potencial y Curva IPR")
+    st.title("🎯 Análisis de Potencial y Curva IPR")
 
     # Layout de entrada y salida
-    main_col1, main_col2 = st.columns([1, 2.5], gap="large")
+    main_col1, main_col2 = st.columns([1, 3], gap="large")
 
     with main_col1:
         with st.container(border=True):
             st.markdown("### 📥 Parámetros")
             pr = st.number_input("Presión Reservorio (psi)", value=4000)
-            pb = st.number_input("Presión Burbuja (psi)", value=2500)
+            use_pb = st.checkbox("Considerar Presión de Burbuja (Pb)", value=True)
+            if use_pb:
+                pb = st.number_input("Presión Burbuja (psi)", value=2500)
+            else:
+                pb = None
             ef = st.slider("Eficiencia de Flujo", 0.1, 2.0, 1.0, 0.1)
 
             st.markdown("---")
@@ -134,16 +138,32 @@ elif selected == "Potencial Yacimiento":
 
     with main_col2:
         # Cálculo de valores clave
-        j_val = j_calc(q_test, pwf_test, pr, pb, ef)
-        aof_val = Qo_calc(q_test, pwf_test, pr, 0, pb, ef)
-        qb_val = j_val * (pr - pb)
+        j_val = j(q_test, pwf_test, pr, pb, ef)
+        if pb is None:
+            aof_val = j_val * pr
+        else:
+            aof_val = Qo_calc(q_test, pwf_test, pr, 0, pb, ef)
+
+        if pb is None:
+            qb_val = "NO"
+        else:
+            qb_val = j_val * (pr - pb)
 
         # KPIs en la parte superior
-        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1, kpi2, kpi3, kpi4= st.columns(4)
         kpi1.metric("Índice de Prod. (J)", f"{j_val:.2f}",
                     help="Barriles por día por cada psi de caída")
-        kpi2.metric("Qb @ Pb", f"{qb_val:.0f} bpd")
+        if pb is None:
+            kpi2.metric("Qb @ Pb", "NO")
+        else:
+            kpi2.metric("Qb @ Pb", f"{qb_val:.0f} bpd")
         kpi3.metric("AOF (Potencial Máx)", f"{aof_val:.0f} bpd", delta_color="normal")
+
+        if pb is None:
+            kpi4.metric("Modelo", "Darcy")
+        else:
+            kpi4.metric("Modelo", "Vogel")
+
 
         # Espacio para el gráfico
         with st.container(border=True):
@@ -191,21 +211,250 @@ elif selected == "Potencial Yacimiento":
 
 # --- SECCIÓN: HISTORIAL VOLVE ---
 elif selected == "Historial VOLVE":
-    st.title("📊 Historial de Producción")
-    st.info("Cargue los datos históricos para visualizar el comportamiento del campo.")
+    st.title("📊 Historial de Producción – Campo Volve")
 
-    uploaded_file = st.file_uploader("Cargar archivo Excel de Volve",
-                                     type=["xlsx", "csv"])
+    # --- Carga de archivo ---
+    uploaded_file = st.file_uploader(
+        "Cargar Excel de producción",
+        type="xlsx"
+    )
 
     if uploaded_file:
-        st.success("Archivo cargado correctamente (Simulación)")
-        # Aquí iría el código de procesamiento de datos
+        df = pd.read_excel(uploaded_file, sheet_name=1)
+        st.success("Archivo cargado por el usuario")
+    else:
+        df = pd.read_excel("data/Volve_production_data.xlsx", sheet_name=1)
+        st.warning("Usando archivo local por defecto")
+
+    # --- Limpieza de columnas ---
+    df.columns = df.columns.str.lower().str.strip()
+
+    # --- Renombrar columnas ---
+    df = df.rename(columns={
+        "wellbore name": "WELL",
+        "year": "TIME_YEARS",
+        "oil": "Q_OIL",
+        "water": "Q_WATER"
+    })
+
+    # --- Selector de pozo ---
+    wells = sorted(df["WELL"].dropna().unique())
+    selected_well = st.selectbox(
+        "Seleccione un pozo",
+        wells
+    )
+
+    df_well = df[df["WELL"] == selected_well]
+
+    # --- GRÁFICAS ---
+    col1, col2 = st.columns(2, gap="large")
+
+    # 🛢️ Petróleo
+    with col1:
+        fig_oil = go.Figure()
+        fig_oil.add_trace(go.Scatter(
+            x=df_well["TIME_YEARS"],
+            y=df_well["Q_OIL"],
+            mode="lines+markers",
+            name="Oil"
+        ))
+
+        fig_oil.update_layout(
+            title=f"Caudal de Petróleo – {selected_well}",
+            xaxis_title="Tiempo (años)",
+            yaxis_title="Q Oil (bpd)",
+            template="plotly_dark",
+            height=400
+        )
+
+        st.plotly_chart(fig_oil, use_container_width=True)
+
+    # 💧 Agua
+    with col2:
+        fig_water = go.Figure()
+        fig_water.add_trace(go.Scatter(
+            x=df_well["TIME_YEARS"],
+            y=df_well["Q_WATER"],
+            mode="lines+markers",
+            name="Water"
+        ))
+
+        fig_water.update_layout(
+            title=f"Caudal de Agua – {selected_well}",
+            xaxis_title="Tiempo (años)",
+            yaxis_title="Q Water (bpd)",
+            template="plotly_dark",
+            height=400
+        )
+
+        st.plotly_chart(fig_water, use_container_width=True)
+
+    # --- GRÁFICA COMBINADA ---
+    st.markdown("### 📈 Producción Oil + Water")
+
+    fig_combined = go.Figure()
+
+    fig_combined.add_trace(go.Scatter(
+        x=df_well["TIME_YEARS"],
+        y=df_well["Q_OIL"],
+        mode="lines",
+        name="Oil"
+    ))
+
+    fig_combined.add_trace(go.Scatter(
+        x=df_well["TIME_YEARS"],
+        y=df_well["Q_WATER"],
+        mode="lines",
+        name="Water"
+    ))
+
+    fig_combined.update_layout(
+        title=f"Producción Total – {selected_well}",
+        xaxis_title="Tiempo (años)",
+        yaxis_title="Caudal (bpd)",
+        template="plotly_dark",
+        height=450
+    )
+
+    st.plotly_chart(fig_combined, use_container_width=True)
+
+    # --- TABLA ---
+    with st.expander("📄 Ver datos del pozo"):
+        st.dataframe(
+            df_well[["TIME_YEARS", "Q_OIL", "Q_WATER"]],
+            use_container_width=True
+        )
 
 # --- SECCIÓN: ANÁLISIS NODAL ---
 elif selected == "Análisis Nodal":
-    st.title("🕸️ Análisis Nodal")
-    st.warning("Sección en desarrollo: Integración de curvas VLP próximamente.")
+    st.title("Análisis Nodal Monofasico")
+    st.markdown(
+        "Esta sección permite evaluar el comportamiento integral del sistema "
+        "yacimiento–pozo–superficie mediante el análisis de curvas IPR y VLP."
+    )
 
-# --- FOOTER ---
-st.markdown("---")
-st.caption("Desarrollado para Ingeniería de Producción | Campo Volve Open Data Project")
+    # Layout de entrada y salida
+    main_col1, main_col2 = st.columns([1, 2.5], gap="large")
+
+    with main_col1:
+        with st.container(border=True):
+            st.markdown("### 📥 Parámetros")
+            pr = st.number_input("Presión Reservorio (psi)", value=2800)
+            q_test = st.number_input("Caudal prueba (bpd)", value=1500)
+            pwf_test = st.number_input("Pwf prueba (psi)", value=2150)
+            THP = st.number_input("THP (psi)", value=360)
+            WC = st.number_input("corte de agua (%)", value=0.35)
+            SGH2O = st.number_input("SGH2O", value=1.09)
+            API = st.number_input("API", value=27)
+            ID = st.number_input("Diametro interno (in)", value=3.5)
+            TVD = st.number_input("True vertical depth (ft)", value=9000)
+            MD = st.number_input("Measured Depth (ft)", value=10500)
+
+    with main_col2:
+        # Cálculo de valores clave
+        j_val = J_Darcy(pr, pwf_test, q_test)
+        AOF = Q_Darcy(j_val, pr, 0)
+        SGoil = 141.5/(131.5 + API)
+        SGavg = SGoil * (1 - WC) + SGH2O * WC
+        Gavg = SGavg * 0.433
+        Pg = SGavg * 0.433
+
+        # KPIs en la parte superior
+        kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+        kpi1.metric("Índice de Prod. (J)", f"{j_val:.2f} bbl/d/psi",
+                    help="Barriles por día por cada psi de caída")
+        kpi2.metric("AOF (caudal maximo)", f"{AOF:.0f} bpd")
+        kpi3.metric("SGoil", f"{SGoil:.4f} ", delta_color="normal")
+        kpi4.metric("SGavg", f"{SGavg:.4f} ", delta_color="normal")
+        kpi5.metric("Gavg", f"{Gavg:.4f} ", delta_color="normal")
+
+        st.markdown("---")
+
+        st.markdown("### 📊 Tabla IPR – Nodal")
+
+        # Rango de presiones desde Pr hasta 0 en pasos de 100 psi
+        pressure_values = list(range(int(pr), -1, -100))
+
+        # Caudales calculados con IPR (Darcy)
+        Q_values = [Q_Darcy(j_val, pr, pwf) for pwf in pressure_values]
+
+        # Factor de fricción
+        f_values = [faming(Q, ID) for Q in Q_values]
+
+        # Pérdida por fricción acumulada
+        F_values = [f * MD for f in f_values]
+
+        # Pérdida por fricción corregida por gravedad
+        PF_values = [F * SGavg for F in F_values]
+
+        # Presión de operación
+        PO_values = [THP + Pg + PF for PF in PF_values]
+
+        # Presión del sistema
+        Psys_values = [PO - pwf for PO, pwf in zip(PO_values, pressure_values)]
+
+        # DataFrame final
+        df_nodal = pd.DataFrame({
+            "Pwf (psi)": pressure_values,
+            "Q (bpd)": Q_values,
+            "THP (psi)": [THP] * len(pressure_values),
+            "Pg (psi/ft)": [Pg] * len(pressure_values),
+            "f": f_values,
+            "F": F_values,
+            "PF": PF_values,
+            "PO (psi)": PO_values,
+            "Psys (psi)": Psys_values
+        })
+
+        # Mostrar tabla
+        st.dataframe(
+            df_nodal,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        fig = go.Figure()
+
+        # Curva IPR
+        fig.add_trace(go.Scatter(
+            x=Q_values,
+            y=pressure_values,
+            mode="lines+markers",
+            name="IPR",
+            line=dict(dash="solid"),
+            marker=dict(size=6)
+        ))
+
+        # Curva VLP
+        fig.add_trace(go.Scatter(
+            x=Q_values,
+            y=PO_values,
+            mode="lines+markers",
+            name="VLP",
+            line=dict(dash="dash"),
+            marker=dict(size=6)
+        ))
+
+        # Curva del Sistema
+        fig.add_trace(go.Scatter(
+            x=Q_values,
+            y=Psys_values,
+            mode="lines+markers",
+            name="Sistema",
+            line=dict(dash="dot"),
+            marker=dict(size=6)
+        ))
+
+        # Layout correcto para análisis nodal
+        fig.update_layout(
+            title="Curvas IPR – VLP – Sistema",
+            xaxis_title="Caudal (bpd)",
+            yaxis_title="Presión (psi)",
+            yaxis=dict(autorange="reversed"),  # Presión decrece hacia abajo
+            template="plotly_dark",
+            legend=dict(x=0.01, y=0.99),
+            height=500
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+...................................
