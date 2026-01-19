@@ -149,20 +149,110 @@ with st.sidebar:
 
 # --- SECCIÓN: INICIO ---
 if selected == "Inicio":
-    st.title("🚀 Dashboard de Ingeniería de Producción")
+
+    # --- HERO SECTION ---
     st.markdown("""
-    Bienvenido a la plataforma de análisis del *Campo Volve*. 
-    Esta herramienta permite optimizar la toma de decisiones mediante:
-    * *Visualización de Históricos:* Análisis de tendencias de producción.
-    * *Modelado IPR:* Curvas de oferta del yacimiento.
-    * *Optimización:* Análisis nodal y sensibilidad.
+    <div style="
+        background: linear-gradient(135deg, #0e1117, #1f2933);
+        padding: 40px;
+        border-radius: 20px;
+        margin-bottom: 30px;
+    ">
+        <h1 style="color:#f39c12; font-size:42px; margin-bottom:10px;">
+            Production Analysis Dashboard
+        </h1>
+        <p style="color:#d1d5db; font-size:18px; max-width:900px;">
+            Plataforma interactiva para el análisis integral de producción,
+            evaluación del potencial del yacimiento y análisis nodal del sistema
+            yacimiento–pozo–superficie.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- MÉTRICAS RESUMEN ---
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("📊 Módulos Activos", "4")
+    col2.metric("🛢️ Campo", "VOLVE")
+    col3.metric("⚙️ Modelos", "Darcy • Vogel • Standing.")
+    col4.metric("📈 Enfoque", "Ingeniería de Producción")
+
+    st.markdown("---")
+
+    # --- TARJETAS DE MÓDULOS ---
+    st.markdown("## 🔎 Módulos Disponibles")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.markdown("""
+        <div class="stMetric">
+        <h4>📊 Historial VOLVE</h4>
+        <p style="font-size:14px;">
+        Visualización histórica de producción de petróleo y agua por pozo.
+        Identificación de tendencias y comportamiento productivo.
+        </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown("""
+        <div class="stMetric">
+        <h4>🎯 Potencial del Yacimiento</h4>
+        <p style="font-size:14px;">
+        Evaluación del índice de productividad, curvas IPR (Darcy/Vogel)
+        y estimación del AOF.
+        </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c3:
+        st.markdown("""
+        <div class="stMetric">
+        <h4>📈 Análisis Nodal</h4>
+        <p style="font-size:14px;">
+        Integración IPR–VLP–Sistema para análisis del punto de operación
+        del pozo.
+        </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c4:
+        st.markdown("""
+        <div class="stMetric">
+        <h4>⚙️ Optimización</h4>
+        <p style="font-size:14px;">
+        Evaluación de sensibilidad operacional y soporte a decisiones
+        de levantamiento artificial.
+        </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # --- FLUJO RECOMENDADO ---
+    st.markdown("## 🧭 Flujo Recomendado de Uso")
+
+    st.markdown("""
+    1. *Historial VOLVE*  
+       Analice el comportamiento histórico del pozo (oil y water).
+
+    2. *Potencial del Yacimiento*  
+       Determine el índice de productividad y el potencial máximo (AOF).
+
+    3. *Análisis Nodal*  
+       Integre el sistema completo para identificar el punto de operación.
+
+    > 💡 Este flujo replica el proceso real de evaluación en ingeniería de producción.
     """)
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.info(
-            "💡 *Tip:* Comience configurando los datos en la sección 'Potencial Yacimiento'.")
+    st.markdown("---")
 
+    # --- MENSAJE FINAL ---
+    st.info(
+        "📌 Esta herramienta está diseñada para análisis técnico, soporte a decisiones "
+        "operacionales y entrenamiento en ingeniería de producción."
+    )
 # --- SECCIÓN: POTENCIAL DEL YACIMIENTO ---
 elif selected == "Potencial Yacimiento":
     st.subheader("🎯 Análisis de Potencial y Curva IPR")
