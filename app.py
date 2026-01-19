@@ -47,25 +47,47 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- LÓGICA DE CÁLCULO (Se mantiene intacta) ---
-def j_calc(q_test, pwf_test, pr, pb, ef=1):
-    if ef == 1:
-        if pwf_test >= pb:
-            return q_test / (pr - pwf_test)
-        else:
-            return q_test / ((pr - pb) + (pb / 1.8) * (
-                        1 - 0.2 * (pwf_test / pb) - 0.8 * (pwf_test / pb) ** 2))
-    else:
-        if pwf_test >= pb:
-            return q_test / (pr - pwf_test)
-        else:
-            return q_test / ((pr - pb) + (pb / 1.8) * (
-                        1.8 * (1 - pwf_test / pb) - 0.8 * ef * (
-                            1 - pwf_test / pb) ** 2))
+# --- LÓGICA DE CÁLCULO ---
+def j(q_test, pwf_test, pr, pb, ef=1, ef2=None):
+    if ef == 1 and pb is None:
+        J = q_test/(pr - pwf_test)
+    if ef == 1 and pb is not None:  # Darcy & Vogel
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = q_test / (pr - pwf_test)
+        else:  # Saturated reservoir
+            J = q_test / ((pr - pb) + (pb / 1.8) * \
+            (1 - 0.2 * (pwf_test / pb) - 0.8 * (pwf_test / pb) ** 2))
 
+    elif ef != 1 and ef2 is None and pb is not None:  # Darcy & Standing
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = q_test / (pr - pwf_test)
+        else:  # Saturated reservoir
+            J = q_test / ((pr - pb) + (pb / 1.8) * \
+            (1.8 * (1 - pwf_test / pb) - 0.8 * ef * (
+             1 - pwf_test / pb) ** 2))
+
+    elif ef != 1 and ef2 is not None and pb is not None:  # Darcy & Standing
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = ((q_test / (pr - pwf_test)) / ef) * ef2
+        else:  # Saturated reservoir
+            J = ((q_test / ((pr - pb) + (pb / 1.8) * \
+            (1.8 * (1 - pwf_test / pb) - 0.8 * \
+            ef * (1 - pwf_test / pb) ** 2))) / ef) * ef2
+    return J
+
+def J_Darcy(pr, pwf_test, q_test):
+    J = q_test/(pr - pwf_test)
+    return J
+def Q_Darcy(J, Pr, pwf):
+    Q = J * (Pr - pwf)
+    return Q
+
+def faming(Q, ID):
+    f = (2.083/1000)((100*Q/(34.3*120))1.85)((1/ID)**4.8655)
+    return f
 
 def Qo_calc(q_test, pwf_test, pr, pwf, pb, ef=1):
-    j_val = j_calc(q_test, pwf_test, pr, pb, ef)
+    j_val = j(q_test, pwf_test, pr, pb, ef)
     if pwf >= pb:
         return j_val * (pr - pwf)
     else:
