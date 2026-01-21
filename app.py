@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- CONFIGURACIÓN DE PÁGINA --
 st.set_page_config(
     page_title="Production Analisis",
     page_icon="Logo.png",
@@ -83,7 +83,11 @@ def Q_Darcy(J, Pr, pwf):
     return Q
 
 def faming(Q, ID):
+#<<<<<<< Paso_5
     f = (2.083/1000)*((100*Q/(34.3*120))**1.85)*((1/ID)**4.8655)
+#=======
+    f = (2.083/1000)*((100*Q/(34.3*120))*1.85)*((1/ID)**4.8655)
+#>>>>>>> develop
     return f
 
 def Qo_calc(q_test, pwf_test, pr, pwf, pb, ef=1):
@@ -286,7 +290,7 @@ def Qo(q_test, pwf_test, pr, pwf, pb, ef=1, ef2= 1):
 with st.sidebar:
     st.image(
         "Company.png",
-        width=200)  # Placeholder para logo
+        width=500)  # Placeholder para logo
     st.markdown(
         """
         <div style="
@@ -891,4 +895,8 @@ elif selected == "Análisis Nodal":
             height=500
         )
 
+#<<<<<<< Paso_5
         st.plotly_chart(fig, use_container_width=True)
+#=======
+        st.plotly_chart(fig, use_container_width=True)
+#>>>>>>> develop
