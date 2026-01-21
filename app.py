@@ -83,7 +83,11 @@ def Q_Darcy(J, Pr, pwf):
     return Q
 
 def faming(Q, ID):
+#<<<<<<< Paso_5
+    f = (2.083/1000)*((100*Q/(34.3*120))**1.85)*((1/ID)**4.8655)
+#=======
     f = (2.083/1000)*((100*Q/(34.3*120))*1.85)*((1/ID)**4.8655)
+#>>>>>>> develop
     return f
 
 def Qo_calc(q_test, pwf_test, pr, pwf, pb, ef=1):
@@ -98,6 +102,188 @@ def Qo_calc(q_test, pwf_test, pr, pwf, pb, ef=1):
         else:
             return q_at_pb + ((j_val * pb) / 1.8) * (
                         1.8 * (1 - pwf / pb) - 0.8 * ef * (1 - pwf / pb) ** 2)
+
+
+def Qo(q_test, pwf_test, pr, pwf, pb, ef=1, ef2=None):
+    ef_activa = ef if ef2 is None else ef2
+    j_val = j(q_test, pwf_test, pr, pb, ef, ef2)
+
+    # Yacimiento saturado
+    if pb is not None and pr < pb:
+        return ((j_val * pr) / 1.8) * (
+            1 - 0.2 * (pwf / pr) - 0.8 * (pwf / pr) ** 2
+        )
+
+    # Darcy
+    if pb is None or pwf >= pb:
+        return j_val * (pr - pwf)
+
+    # Vogel / Standing
+    q_at_pb = j_val * (pr - pb)
+
+    if ef_activa == 1:
+        return q_at_pb + ((j_val * pb) / 1.8) * (
+            1 - 0.2 * (pwf / pb) - 0.8 * (pwf / pb) ** 2
+        )
+    else:
+        return q_at_pb + ((j_val * pb) / 1.8) * (
+            1.8 * (1 - pwf / pb) -
+            0.8 * ef_activa * (1 - pwf / pb) ** 2
+        )
+
+###################################################################################
+#Calculos
+# Productivity Index
+def j(q_test, pwf_test, pr, pb, ef=1, ef2 = 1):
+    if ef == 1:  # Darcy & Vogel
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = q_test / (pr - pwf_test)
+        else:  # Saturated reservoir
+            J = q_test / ((pr - pb) + (pb / 1.8) * \
+                          (1 - 0.2 * (pwf_test / pb) - 0.8 * (pwf_test / pb) ** 2))
+
+    elif ef != 1 and ef2 == 1:  # Darcy & Standing
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = q_test / (pr - pwf_test)
+        else:  # Saturated reservoir
+            J = q_test / ((pr - pb) + (pb / 1.8) * \
+                          (1.8 * (1 - pwf_test / pb) - 0.8 * ef * (
+                                      1 - pwf_test / pb) ** 2))
+
+    elif ef != 1 and ef2 != 1:  # Darcy & Standing
+        if pwf_test >= pb:  # Subsaturated reservoir
+            J = ((q_test / (pr - pwf_test)) / ef) * ef2
+        else:  # Saturated reservoir
+            J = ((q_test / ((pr - pb) + (pb / 1.8) * \
+                            (1.8 * (1 - pwf_test / pb) - 0.8 * \
+                             ef * (1 - pwf_test / pb) ** 2))) / ef) * ef2
+    return J
+
+# Q(bpd) @ Pb
+def Qb(q_test, pwf_test, pr, pb, ef=1, ef2= 1):
+    qb = j(q_test, pwf_test, pr, pb, ef, ef2) * (pr - pb)
+    return qb
+
+
+# AOF(bpd)
+def aof(q_test, pwf_test, pr, pb, ef=1, ef2= 1):
+    if (ef == 1 and ef2 == 1):  # Darcy & Vogel
+        if pr > pb:  # Yac. subsaturado
+            if pwf_test >= pb:
+                AOF = j(q_test, pwf_test, pr, pb) * pr
+            elif pwf_test < pb:
+                AOF = Qb(q_test, pwf_test, pr, pb, ef=1) + (
+                            (j(q_test, pwf_test, pr, pb) * pb) / 1.8)
+        else:  # Yac. Saturado
+            AOF = q_test / (1 - 0.2 * (pwf_test / pr) - 0.8 * (pwf_test / pr) ** 2)
+
+    elif (ef < 1 and ef2 == 1):  # Darcy & Standing
+        if pr > pb:  # Yac. subsatuado
+            if pwf_test >= pb:
+                AOF = j(q_test, pwf_test, pr, pb, ef) * pr
+            elif pwf_test < pb:
+                AOF = Qb(q_test, pwf_test, pr, pb, ef) + (
+                            (j(q_test, pwf_test, pr, pb, ef) * pb) / 1.8) * (
+                                  1.8 - 0.8 * ef)
+        else:  # Yac. saturado
+            AOF = (q_test / (1.8 * ef * (1 - pwf_test / pr) - 0.8 * ef ** 2 * (
+                        1 - pwf_test / pr) ** 2)) * (1.8 * ef - 0.8 * ef ** 2)
+
+    elif (ef > 1 and ef2 == 1):  # Darcy & Standing
+        if pr > pb:  # Yac. subsaturado
+            if pwf_test >= pb:
+                AOF = j(q_test, pwf_test, pr, pb, ef) * pr
+            elif pwf_test < pb:
+                AOF = Qb(q_test, pwf_test, pr, pb, ef) + (
+                            (j(q_test, pwf_test, pr, pb, ef) * pb) / 1.8) * (
+                                  0.624 + 0.376 * ef)
+        else:  # Yac. saturado
+            AOF = (q_test / (1.8 * ef * (1 - pwf_test / pr) - 0.8 * ef ** 2 * (
+                        1 - pwf_test / pr) ** 2)) * (0.624 + 0.376 * ef)
+
+    elif (ef < 1 and ef2 >= 1):  # Darcy & Standing (stimulation)
+        if pr > pb:  # Yac. subsaturado
+            if pwf_test >= pb:
+                AOF = j(q_test, pwf_test, pr, pb, ef, ef2) * pr
+            elif pwf_test < pb:
+                AOF = Qb(q_test, pwf_test, pr, pb, ef, ef2) + (
+                            j(q_test, pwf_test, pr, pb, ef, ef2) * pb / 1.8) * (
+                                  0.624 + 0.376 * ef2)
+        else:  # Yac. saturado
+            AOF = (q_test / (1.8 * ef * (1 - pwf_test / pr) - 0.8 * ef ** 2 * (
+                        1 - pwf_test / pr) ** 2)) * (0.624 + 0.376 * ef2)
+
+    elif (ef > 1 and ef2 <= 1):  # Darcy & Standing (Higher skin)
+        if pr > pb:  # Yac. subsaturado
+            if pwf_test >= pb:
+                AOF = j(q_test, pwf_test, pr, pb, ef, ef2) * pr
+            elif pwf_test < pb:
+                AOF = Qb(q_test, pwf_test, pr, pb, ef, ef2) + (
+                            j(q_test, pwf_test, pr, pb, ef, ef2) * pb / 1.8) * (
+                                  1.8 - 0.8 * ef2)
+        else:  # Yac. saturado
+            AOF = (q_test / (1.8 * ef * (1 - pwf_test / pr) - 0.8 * ef ** 2 * (
+                        1 - pwf_test / pr) ** 2)) * (1.8 - 0.8 * ef2 ** 2)
+
+    return AOF
+
+# Qo (bpd) @ Darcy Conditions
+def qo_darcy(q_test, pwf_test, pr, pwf, pb, ef=1, ef2=None):
+    qo = j(q_test, pwf_test, pr, pb) * (pr - pwf)
+    return qo
+
+#Qo(bpd) @ vogel conditions
+def qo_vogel(q_test, pwf_test, pr, pwf, pb, ef=1, ef2=None):
+    qo = aof(q_test, pwf_test, pr, pb) * \
+         (1 - 0.2 * (pwf / pr) - 0.8 * ( pwf / pr)**2)
+    return qo
+
+# Qo(bpd) @Standing Conditions
+def qo_standing(q_test, pwf_test, pr, pwf, pb, ef=1, ef2=None):
+    qo = aof(q_test, pwf_test, pr, pb, ef) * (1.8 * ef * (1 - pwf / pr) - 0.8 * ef**2 * (1 - pwf / pr)**2)
+    return qo
+
+#Qo(bpd) @ all conditions
+def Qo(q_test, pwf_test, pr, pwf, pb, ef=1, ef2= 1):
+    qo = 0  # Initialize qo with a default value
+
+    if ef == 1 and ef2 == 1:
+        if pr > pb:  # Yacimiento subsaturado
+            if pwf >= pb:
+                qo = qo_darcy(q_test, pwf_test, pr, pwf, pb)
+            elif pwf < pb:
+                qo = Qb(q_test, pwf_test, pr, pb) + \
+                    ((j(q_test, pwf_test, pr, pb) * pb) / 1.8) * \
+                    (1 - 0.2 * (pwf / pb) - 0.8 * (pwf / pb)**2)
+        else:  # Yacimiento saturado
+            qo = qo_vogel(q_test, pwf_test, pr, pwf, pb)
+
+    elif ef != 1 and ef2 == 1:
+        if pr > pb:  # Yacimiento subsaturado
+            if pwf >= pb:
+                qo = qo_darcy(q_test, pwf_test, pr, pwf, pb, ef)
+            elif pwf < pb:
+                qo = Qb(q_test, pwf_test, pr, pb, ef) + \
+                    ((j(q_test, pwf_test, pr, pb, ef) * pb) / 1.8) * \
+                    (1.8 * (1 - pwf / pb) - 0.8 * ef * (1 - pwf / pb)**2)
+        else:  # Yacimiento saturado
+            qo = qo_standing(q_test, pwf_test, pr, pwf, pb, ef)
+
+    elif ef != 1 and ef2 != 1:
+        if pr > pb:  # Yacimiento subsaturado
+            if pwf >= pb:
+                qo = qo_darcy(q_test, pwf_test, pr, pwf, pb, ef, ef2)
+            elif pwf < pb:
+                qo = Qb(q_test, pwf_test, pr, pb, ef, ef2) + \
+                    ((j(q_test, pwf_test, pr, pb, ef, ef2) * pb) / 1.8) * \
+                    (1.8 * (1 - pwf / pb) - 0.8 * ef * (1 - pwf / pb)**2)
+        else:  # Yacimiento saturado
+            qo = qo_standing(q_test, pwf_test, pr, pwf, pb, ef, ef2)
+
+    else:
+        raise ValueError("Invalid combination of ef and ef2 values")
+
+    return qo
 
 
 # --- NAVEGACIÓN LATERAL ---
@@ -168,6 +354,12 @@ if selected == "Inicio":
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+    # --- IMAGEN DEBAJO DEL HERO ---
+    st.image(
+        "Sistema_produccion.png",
+        use_container_width=True
+    )
 
     # --- MÉTRICAS RESUMEN ---
     col1, col2, col3, col4 = st.columns(4)
@@ -248,110 +440,217 @@ if selected == "Inicio":
 
     st.markdown("---")
 
+    st.markdown("""
+    <h2 style="font-size:36px; color:#f39c12;">
+        ¿Qué hace un ingeniero en producción?
+    </h2>
+    """, unsafe_allow_html=True)
+
+    main_col1, main_col2 = st.columns([2, 2], gap="large")
+
+    # ---------------- INPUTS ----------------
+    with main_col1:
+        with st.container(border=True):
+            st.markdown("# COMO SE FORMO EL PETROLEO")
+            st.markdown("## rompiendo mitos, el petroleo se forma de una manera increible"
+                        ", y no es de los dinosaurios como todos creen")
+            # --- VIDEO LOCAL ---
+            st.video("https://www.youtube.com/watch?v=KQbWFGB_Io4")
+    with main_col2:
+        with st.container(border=True):
+            st.markdown("# QUE ES LA INGERNERIA PETROLERA")
+            st.markdown("## Conoce los diferentes campos y oportunidades que ofrece la ingeneria petrolera")
+            # --- VIDEO LOCAL ---
+            st.video("petroleos.mp4")
+
     # --- MENSAJE FINAL ---
     st.info(
         "📌 Esta herramienta está diseñada para análisis técnico, soporte a decisiones "
         "operacionales y entrenamiento en ingeniería de producción."
     )
-# --- SECCIÓN: POTENCIAL DEL YACIMIENTO ---
+    st.info(
+        "📌 Esta pagina fue desarrollada por Cesar Garcia (Geologia) y Marco Aspiazu (Petroleos)."
+    )
+
+#-----SECCION POTENCIAL YACIMIENTO-----------------------
 elif selected == "Potencial Yacimiento":
     st.title("🎯 Análisis de Potencial y Curva IPR")
 
-    # Layout de entrada y salida
     main_col1, main_col2 = st.columns([1, 3], gap="large")
 
+    # ---------------- INPUTS ----------------
     with main_col1:
         with st.container(border=True):
             st.markdown("### 📥 Parámetros")
+
             pr = st.number_input("Presión Reservorio (psi)", value=4000)
+
             use_pb = st.checkbox("Considerar Presión de Burbuja (Pb)", value=True)
-            if use_pb:
-                pb = st.number_input("Presión Burbuja (psi)", value=2500)
-            else:
-                pb = None
+            pb = st.number_input("Presión Burbuja (psi)", value=2500) if use_pb else 0
+
             ef = st.slider("Eficiencia de Flujo", 0.1, 2.0, 1.0, 0.1)
+
+            use_ef2 = st.checkbox("Considerar Eficiencia de Flujo 2", value=False)
+            ef2 = st.slider("Eficiencia de Flujo 2", 0.1, 2.0, 1.0, 0.1) if use_ef2 else 1
 
             st.markdown("---")
             st.markdown("### 🧪 Datos de Prueba")
             q_test = st.number_input("Caudal prueba (bpd)", value=800)
             pwf_test = st.number_input("Pwf prueba (psi)", value=3200)
 
+    # ---------------- CALCULOS ----------------
     with main_col2:
-        # Cálculo de valores clave
-        j_val = j(q_test, pwf_test, pr, pb, ef)
-        if pb is None:
-            aof_val = j_val * pr
+
+        j_val = j(q_test, pwf_test, pr, pb, ef, ef2)
+        aof_val = aof(q_test, pwf_test, pr, pb, ef, ef2)
+
+        if pb is None or pr <= pb:
+            qb_val = None
         else:
-            aof_val = Qo_calc(q_test, pwf_test, pr, 0, pb, ef)
+            qb_val = Qb(q_test, pwf_test, pr, pb, ef, ef2)
 
-        if pb is None:
-            qb_val = "NO"
-        else:
-            qb_val = j_val * (pr - pb)
+        # ---------------- KPIs ----------------
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
-        # KPIs en la parte superior
-        kpi1, kpi2, kpi3, kpi4= st.columns(4)
-        kpi1.metric("Índice de Prod. (J)", f"{j_val:.2f}",
-                    help="Barriles por día por cada psi de caída")
-        if pb is None:
-            kpi2.metric("Qb @ Pb", "NO")
-        else:
-            kpi2.metric("Qb @ Pb", f"{qb_val:.0f} bpd")
-        kpi3.metric("AOF (Potencial Máx)", f"{aof_val:.0f} bpd", delta_color="normal")
+        kpi1.metric("Índice de Prod. (J)", f"{j_val:.2f}")
 
-        if pb is None:
-            kpi4.metric("Modelo", "Darcy")
-        else:
-            kpi4.metric("Modelo", "Vogel")
+        kpi2.metric(
+            "Qb @ Pb",
+            "NO" if (pb == 0 or pr < pb) else f"{qb_val:.0f} bpd"
+        )
 
+        kpi3.metric("AOF (Caudal Máximo)", f"{aof_val:.0f} bpd")
 
-        # Espacio para el gráfico
+        if pb == 0:
+            modelo = "Darcy"
+        elif pr > pb and ef == 1:
+            modelo = "Darcy + Vogel"
+        elif pr < pb and ef == 1:
+            modelo = "Vogel"
+        elif pr < pb and ef != 1:
+            modelo = "Standing"
+        elif pr > pb and ef != 1:
+            modelo = "Darcy + Standing"
+
+        kpi4.metric("Modelo", modelo)
+
+        # ---------------- GRAFICA IPR ----------------
         with st.container(border=True):
-            pwf_values = np.linspace(0, pr, 100)
-            qo_values = [Qo_calc(q_test, pwf_test, pr, p, pb, ef) for p in pwf_values]
 
+            pwf_values = np.linspace(0, pr, 100)
+
+            # ===============================
+            # CASO 1: SIN PRESIÓN DE BURBUJA
+            # ===============================
+            if pb == 0:
+
+                # EF1 (Darcy puro)
+                j_ef1 = j(q_test, pwf_test, pr, pb, ef, None)
+                qo_values_ef1 = [
+                    j_ef1 * (pr - p)
+                    for p in pwf_values
+                ]
+
+                # EF2 (Darcy con J ajustado)
+                if ef2 == 1:
+                    j_ef2 = j(q_test, pwf_test, pr, pb, ef, ef2)
+                    qo_values_ef2 = [
+                        j_ef2 * (pr - p)
+                        for p in pwf_values
+                    ]
+
+            # ===============================
+            # CASO 2: CON PRESIÓN DE BURBUJA
+            # ===============================
+            else:
+
+                # EF1 (Darcy / Vogel / Standing)
+                qo_values_ef1 = [
+                    Qo(q_test, pwf_test, pr, p, pb, ef, ef2)
+                    for p in pwf_values
+                ]
+
+                # EF2 (si existe)
+                if ef2 != 1:
+                    qo_values_ef2 = [
+                        Qo(q_test, pwf_test, pr, p, pb, ef, ef2)
+                        for p in pwf_values
+                    ]
+
+            # ===============================
+            # CONSTRUCCIÓN DE LA GRÁFICA
+            # ===============================
             fig = go.Figure()
 
-            # Línea IPR
+            # Curva IPR – EF1
             fig.add_trace(go.Scatter(
-                x=qo_values, y=pwf_values,
-                name="Curva IPR",
+                x=qo_values_ef1,
+                y=pwf_values,
+                name=f"IPR – EF1 = {ef}",
                 line=dict(color='#00d4ff', width=4),
-                fill='tozerox',  # Sombreado bajo la curva
+                fill='tozerox',
                 fillcolor='rgba(0, 212, 255, 0.1)'
             ))
 
-            # Punto de la prueba
+            # Curva IPR – EF2 (si existe)
+            if ef2 != 1:
+                fig.add_trace(go.Scatter(
+                    x=qo_values_ef2,
+                    y=pwf_values,
+                    name=f"IPR – EF2 = {ef2}",
+                    line=dict(color='lime', width=3, dash='dash')
+                ))
+
+            # Punto de prueba
             fig.add_trace(go.Scatter(
-                x=[q_test], y=[pwf_test],
+                x=[q_test],
+                y=[pwf_test],
                 mode='markers',
                 name='Punto de Prueba',
                 marker=dict(color='orange', size=12, symbol='diamond')
             ))
 
-            # Estética del gráfico
+            # Línea de Pb (solo si existe)
+            if pb != 0:
+                fig.add_hline(
+                    y=pb,
+                    line_dash="dash",
+                    line_color="red",
+                    annotation_text=f"Pb: {pb} psi",
+                    annotation_position="top right"
+                )
+
+            # Estética
             fig.update_layout(
                 title="<b>Inflow Performance Relationship (IPR)</b>",
                 xaxis_title="Caudal (bpd)",
                 yaxis_title="Pwf (psi)",
                 template="plotly_dark",
                 hovermode="x unified",
-                margin=dict(l=20, r=20, t=50, b=20),
                 height=450,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
             )
 
-            # Línea de Pb
-            fig.add_hline(y=pb, line_dash="dash", line_color="red",
-                          annotation_text=f"Pb: {pb} psi",
-                          annotation_position="top right")
-
             st.plotly_chart(fig, use_container_width=True)
+
 
 # --- SECCIÓN: HISTORIAL VOLVE ---
 elif selected == "Historial VOLVE":
     st.title("📊 Historial de Producción – Campo Volve")
+
+    # --- IMAGEN DEBAJO DEL HERO ---
+    st.image(
+        "Volve.png",
+        use_container_width=True
+    )
+
+    st.markdown("# INFORMACION CAMPO VOLVE (NORUEGA)")
+    st.markdown("## El campo Volve, ubicado en el Mar del Norte, es conocido por sus "
+                "importantes reservas de hidrocarburos y su complejidad geológica. "
+                "Este campo ha sido objeto de numerosos estudios debido a su relevancia "
+                "como reservorio productivo y la disponibilidad de su información al "
+                "público.")
 
     # --- Carga de archivo ---
     uploaded_file = st.file_uploader(
@@ -506,7 +805,7 @@ elif selected == "Análisis Nodal":
         kpi2.metric("AOF (caudal maximo)", f"{AOF:.0f} bpd")
         kpi3.metric("SGoil", f"{SGoil:.4f} ", delta_color="normal")
         kpi4.metric("SGavg", f"{SGavg:.4f} ", delta_color="normal")
-        kpi5.metric("Gavg", f"{Gavg:.4f} ", delta_color="normal")
+        kpi5.metric("Gavg", f"{Gavg:.4f} psi/ft", delta_color="normal")
 
         st.markdown("---")
 
@@ -590,10 +889,14 @@ elif selected == "Análisis Nodal":
             title="Curvas IPR – VLP – Sistema",
             xaxis_title="Caudal (bpd)",
             yaxis_title="Presión (psi)",
-            yaxis=dict(autorange="reversed"),  # Presión decrece hacia abajo
+            yaxis_autorange= True,  # Presión decrece hacia abajo
             template="plotly_dark",
             legend=dict(x=0.01, y=0.99),
             height=500
         )
 
+#<<<<<<< Paso_5
         st.plotly_chart(fig, use_container_width=True)
+#=======
+        st.plotly_chart(fig, use_container_width=True)
+#>>>>>>> develop
